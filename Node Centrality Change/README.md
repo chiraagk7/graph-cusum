@@ -8,4 +8,4 @@ This experiment aims to detect a change in node centrality from a "flat" distrib
 signal-generating filter can be varied. Corresponds to Fig. 2A.
 - `edd_vs_arl.py` - saves the average run length under pre-change and post-change conditions for various threshold values and values of c. Corresponds to Fig. 2B ("param" case)
 - `edd_vs_arl_no_param.py` - saves the average run length under pre-change and post-change conditions for various threshold values and values of c. Corresponds to Fig. 2B ("blind" case)
-- `convert_to_csv.py` - utility function to save ARL as .csv
+- `convert_to_csv.py` - utility function to save ARL as .csv (convert from .npy)
