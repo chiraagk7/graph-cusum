@@ -121,10 +121,12 @@ def edd_vs_arl_no_param(trials, c):
     edd_avg /= trials
     return arl_avg, edd_avg
 
-for c in [0.93, 0.94, 0.95]:
-    arl, edd = edd_vs_arl_no_param(trials=25, c=c)
-    np.save("ef_blind_arl_" + str(c), arl)
-    np.save("ef_blind_edd_" + str(c), edd)
+if __name__ == "__main__":
+    for c in [0.93, 0.94, 0.95]:
+        arl, edd = edd_vs_arl_no_param(trials=25, c=c)
+        np.save("ef_blind_arl_" + str(c), arl)
+        np.save("ef_blind_edd_" + str(c), edd)
+
 
 
 

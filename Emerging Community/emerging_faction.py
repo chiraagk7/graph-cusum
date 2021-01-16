@@ -81,114 +81,114 @@ def save_adjacency_csv(A, name):
     '''
     np.savetxt('ef_' + name + '.csv', A, delimiter=",")
 
+if __name__ == "__main__":
+    ### INITIAL GRAPH: ERDOS-RENYI(n, p) ###
 
-### INITIAL GRAPH: ERDOS-RENYI(n, p) ###
+    n = 100 # number of nodes
+    p0 = 2*math.log(n)/n # connection probability
 
-n = 100 # number of nodes
-p0 = 2*math.log(n)/n # connection probability
+    G0 = nx.generators.random_graphs.erdos_renyi_graph(n, p0)
+    A0 = nx.to_numpy_matrix(G0)
 
-G0 = nx.generators.random_graphs.erdos_renyi_graph(n, p0)
-A0 = nx.to_numpy_matrix(G0)
+    ### POST-CHANGE GRAPH: SBM (2 COMMUNITIES) ###
 
-### POST-CHANGE GRAPH: SBM (2 COMMUNITIES) ###
+    p1 = 5*p0 # prob of edge within the emerging faction (community emerges on top of E-R model)
+    alpha = 0.25 # proportion of nodes in C1 (range from 0 to 1)
 
-p1 = 5*p0 # prob of edge within the emerging faction (community emerges on top of E-R model)
-alpha = 0.25 # proportion of nodes in C1 (range from 0 to 1)
+    size = round(n*alpha) # Size of faction
+    A1 = A0.copy()
+    for i in range(size):
+        for j in range(i):
+            if random.random() < p1: # reflip with 5x higher connection probability
+                A1[i, j] = 1
+                A1[j, i] = 1
+            else:
+                A1[i, j] = 0
+                A1[j, i] = 0
 
-size = round(n*alpha) # Size of faction
-A1 = A0.copy()
-for i in range(size):
-    for j in range(i):
-        if random.random() < p1: # reflip with 5x higher connection probability
-            A1[i, j] = 1
-            A1[j, i] = 1
-        else:
-            A1[i, j] = 0
-            A1[j, i] = 0
+    # plt.imshow(A0)
+    # plt.title("Initial Adjacency Matrix")
+    # plt.show()
+    # plt.imshow(A1)
+    # plt.title("Post-Change Adjacency Matrix")
+    # plt.show()
 
-# plt.imshow(A0)
-# plt.title("Initial Adjacency Matrix")
-# plt.show()
-# plt.imshow(A1)
-# plt.title("Post-Change Adjacency Matrix")
-# plt.show()
+    save_adjacency_csv(A0, 'A0')
+    save_adjacency_csv(A1, 'A1')
 
-save_adjacency_csv(A0, 'A0')
-save_adjacency_csv(A1, 'A1')
+    ### GENERATE SIGNALS ###
 
-### GENERATE SIGNALS ###
+    # Define graph filter
+    poly = lambda x: x**2
+    H0 = poly(A0)
+    H1 = poly(A1)
 
-# Define graph filter
-poly = lambda x: x**2
-H0 = poly(A0)
-H1 = poly(A1)
+    # Signal parameters
+    m = 1000 # number of signals to generate
+    t_cp = 600 # index of change point
 
-# Signal parameters
-m = 1000 # number of signals to generate
-t_cp = 600 # index of change point
+    # Generate signals
+    W = np.random.multivariate_normal(np.zeros(n), np.eye(n), m).T
+    Y0 = np.dot(H0, W[:, 0:t_cp])
+    Y1 = np.dot(H1, W[:, t_cp:m+1])
+    Y = np.concatenate((Y0, Y1), axis=1)
 
-# Generate signals
-W = np.random.multivariate_normal(np.zeros(n), np.eye(n), m).T
-Y0 = np.dot(H0, W[:, 0:t_cp])
-Y1 = np.dot(H1, W[:, t_cp:m+1])
-Y = np.concatenate((Y0, Y1), axis=1)
+    ### DETECTION SETUP ###
 
-### DETECTION SETUP ###
+    k = 2 # Number of eigenvectors to consider
+    cusum = {} # dictionary from c -> cusum score over time
+    cs = [0.0, 0.02, 0.04] # values of c to try
+    window_size = 50 # For covariance estimates
 
-k = 2 # Number of eigenvectors to consider
-cusum = {} # dictionary from c -> cusum score over time
-cs = [0.0, 0.02, 0.04] # values of c to try
-window_size = 50 # For covariance estimates
+    wA, U = np.linalg.eigh(A0)
+    U0 = U[:, -k:] # Initial subspace
 
-wA, U = np.linalg.eigh(A0)
-U0 = U[:, -k:] # Initial subspace
-
-alphas = 0.01 * np.array(range(10, 91)) # Possible parameter values (discretized range from 0.25-0.75)
-U1 = {a:post_change_subspace(a, k, p0, p1, n) for a in alphas} # Dict alpha: subspace(alpha)
-
-
+    alphas = 0.01 * np.array(range(10, 91)) # Possible parameter values (discretized range from 0.25-0.75)
+    U1 = {a:post_change_subspace(a, k, p0, p1, n) for a in alphas} # Dict alpha: subspace(alpha)
 
 
-### DETECTION ###
-
-alpha_hats = []
-alphas_saved = False # to avoid duplicate saving alpha_hat estimates 
-
-for c in cs:
-    cusum[c] = [0]
-    for i in range(m - window_size + 1):
-        window = Y[:, i:i+window_size] # Signals in the current window
-        C_hat = (1/window_size) * np.dot(window, window.T) # Empirical covariance
-        wCs, Us = np.linalg.eigh(C_hat)
-        U_hat = Us[:, -k:] # observed subspace
-        alpha_hat = max(alphas, key=lambda a: np.linalg.norm(U1[a].T @ U_hat)) # Parameter estimate
-        if not alphas_saved:
-            alpha_hats.append(alpha_hat)
-        Lt = subspace_dist(U0, U1[alpha_hat]) - subspace_dist(U_hat, U1[alpha_hat]) - c
-        cusum[c].append(max(0, cusum[c][-1] + Lt))
-    alphas_saved = True
 
 
-# plt.plot(alpha_hats)
-# plt.xlabel('Index')
-# plt.ylabel('Predicted Value')
-# plt.title('Predicted Parameter Value Over Time')
-# plt.axvline(x=t_cp-window_size, color='r')
-# plt.show()
+    ### DETECTION ###
 
-save_gamma_hats_csv(alpha_hats)
+    alpha_hats = []
+    alphas_saved = False # to avoid duplicate saving alpha_hat estimates 
 
-# for c in cs:
-#     plt.plot(cusum[c])
+    for c in cs:
+        cusum[c] = [0]
+        for i in range(m - window_size + 1):
+            window = Y[:, i:i+window_size] # Signals in the current window
+            C_hat = (1/window_size) * np.dot(window, window.T) # Empirical covariance
+            wCs, Us = np.linalg.eigh(C_hat)
+            U_hat = Us[:, -k:] # observed subspace
+            alpha_hat = max(alphas, key=lambda a: np.linalg.norm(U1[a].T @ U_hat)) # Parameter estimate
+            if not alphas_saved:
+                alpha_hats.append(alpha_hat)
+            Lt = subspace_dist(U0, U1[alpha_hat]) - subspace_dist(U_hat, U1[alpha_hat]) - c
+            cusum[c].append(max(0, cusum[c][-1] + Lt))
+        alphas_saved = True
 
-# plt.legend(cs)
-# plt.xlabel('Index')
-# plt.ylabel('CUSUM Score')
-# plt.title('Running CUSUM Statistic')
-# plt.axvline(x=t_cp-window_size, color='r')
-# plt.show()
 
-save_cusum_csv(cusum, cs)
+    # plt.plot(alpha_hats)
+    # plt.xlabel('Index')
+    # plt.ylabel('Predicted Value')
+    # plt.title('Predicted Parameter Value Over Time')
+    # plt.axvline(x=t_cp-window_size, color='r')
+    # plt.show()
+
+    save_gamma_hats_csv(alpha_hats)
+
+    # for c in cs:
+    #     plt.plot(cusum[c])
+
+    # plt.legend(cs)
+    # plt.xlabel('Index')
+    # plt.ylabel('CUSUM Score')
+    # plt.title('Running CUSUM Statistic')
+    # plt.axvline(x=t_cp-window_size, color='r')
+    # plt.show()
+
+    save_cusum_csv(cusum, cs)
 
 
 

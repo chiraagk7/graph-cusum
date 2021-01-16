@@ -149,11 +149,13 @@ def edd_vs_arl_param(trials, c):
     return arl_avg, edd_avg
 
 
-for c in [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07]:
-    print("c = " + str(c))
-    arl, edd = edd_vs_arl_param(trials=25, c=c)
-    np.save("ef_param_arl_" + str(c), arl)
-    np.save("ef_param_edd_" + str(c), edd)
+if __name__ == "__main__":
+    for c in [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07]:
+        print("c = " + str(c))
+        arl, edd = edd_vs_arl_param(trials=25, c=c)
+        np.save("ef_param_arl_" + str(c), arl)
+        np.save("ef_param_edd_" + str(c), edd)
+
 
 
 
